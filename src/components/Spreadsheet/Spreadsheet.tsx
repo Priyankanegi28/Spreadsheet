@@ -139,6 +139,22 @@ const Spreadsheet = () => {
   const [columnWidths, setColumnWidths] = useState(columns.map(col => col.width || 120));
   const [hiddenColumns, setHiddenColumns] = useState<number[]>([]);
   const startResizeRef = useRef<{colIdx: number, startX: number, startWidth: number} | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [searchText, setSearchText] = useState('');
+  const [showProfile, setShowProfile] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const [loggedIn, setLoggedIn] = useState(true);
+  const [activeTab, setActiveTab] = useState('All Orders');
+  const [customTabs, setCustomTabs] = useState<string[]>([]);
+  const [addingTab, setAddingTab] = useState(false);
+  const [newTabName, setNewTabName] = useState('');
+  const newTabInputRef = useRef<HTMLInputElement>(null);
+  const [fieldsHidden, setFieldsHidden] = useState(false);
+  const [sortAsc, setSortAsc] = useState(true);
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterCol, setFilterCol] = useState('');
+  const [filterVal, setFilterVal] = useState('');
+  const [showCellView, setShowCellView] = useState(false);
 
   // For empty rows
   const totalRows = 20;
@@ -242,7 +258,87 @@ const Spreadsheet = () => {
   };
 
   // Toolbar button handlers
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files && event.target.files[0];
+    if (file) {
+      // You can add your file processing logic here
+      alert(`Selected file: ${file.name}`);
+      // Reset input so the same file can be selected again if needed
+      event.target.value = '';
+    }
+  };
+
+  const handleExport = () => {
+    // Convert data to CSV
+    const csvRows = [];
+    // Add header row
+    csvRows.push(columns.slice(1).map(col => col.label).join(","));
+    // Add data rows
+    data.forEach(row => {
+      const rowData = columns.slice(1).map(col => {
+        const key = col.key as keyof FinancialData;
+        const val = key ? row[key] || '' : '';
+        // Escape quotes
+        return `"${String(val).replace(/"/g, '""')}"`;
+      });
+      csvRows.push(rowData.join(","));
+    });
+    const csvString = csvRows.join("\n");
+    const blob = new Blob([csvString], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'spreadsheet_export.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleShare = () => {
+    const shareUrl = window.location.href;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      alert('Shareable link copied to clipboard!');
+    });
+  };
+
+  const handleNewAction = () => {
+    if (window.confirm('Are you sure you want to create a new spreadsheet? This will clear all data.')) {
+      // Create 20 empty rows
+      const emptyRows = Array.from({ length: 20 }, () => ({
+        jobRequest: '',
+        submitted: '',
+        status: '',
+        submitter: '',
+        url: '',
+        assigned: '',
+        priority: '',
+        answerQuestion: '',
+        date: '',
+        extract: '',
+        value: ''
+      }));
+      setData(emptyRows);
+      setSelected(null);
+      setEditing(null);
+    }
+  };
+
   const handleToolbarClick = (name: string) => {
+    if (name === 'Import') {
+      fileInputRef.current?.click();
+      return;
+    }
+    if (name === 'Export') {
+      handleExport();
+      return;
+    }
+    if (name === 'Share') {
+      handleShare();
+      return;
+    }
+    if (name === 'New Action') {
+      handleNewAction();
+      return;
+    }
     alert(`${name} clicked! (placeholder)`);
   };
 
@@ -288,6 +384,115 @@ const Spreadsheet = () => {
     setHiddenColumns([]);
   };
 
+  // Helper to highlight search matches
+  function highlightMatch(text: string, search: string) {
+    if (!search) return text;
+    const idx = text.toLowerCase().indexOf(search.toLowerCase());
+    if (idx === -1) return text;
+    const before = text.slice(0, idx);
+    const match = text.slice(idx, idx + search.length);
+    const after = text.slice(idx + search.length);
+    return <>{before}<span className="spreadsheet-highlight">{match}</span>{after}</>;
+  }
+
+  // Filtered data based on search and active tab
+  const statusFilter = (row: FinancialData) => {
+    if (activeTab === 'All Orders') return true;
+    if (activeTab === 'Pending') return row.status === 'Need to start' || row.status === 'In-process';
+    if (activeTab === 'Arrived') return row.status === 'Complete';
+    if (activeTab === 'Reviewed') return row.status === 'Blocked';
+    return true;
+  };
+  const handleApplyFilter = () => {
+    setShowFilter(false);
+  };
+  const handleClearFilter = () => {
+    setFilterCol('');
+    setFilterVal('');
+    setShowFilter(false);
+  };
+  const filteredData = searchText.trim() === ''
+    ? data.filter(row =>
+        statusFilter(row) &&
+        (!filterCol || !filterVal || String((row as any)[filterCol]).toLowerCase().includes(filterVal.toLowerCase()))
+      )
+    : data.filter(row =>
+        statusFilter(row) &&
+        (!filterCol || !filterVal || String((row as any)[filterCol]).toLowerCase().includes(filterVal.toLowerCase())) &&
+        columns.slice(1).some(col => {
+          const key = col.key as keyof FinancialData;
+          const val = key ? String(row[key] ?? '').toLowerCase() : '';
+          return val.includes(searchText.toLowerCase());
+        })
+      );
+
+  const handleSort = () => {
+    setSortAsc((asc) => !asc);
+  };
+
+  // In filteredData, apply sorting by 'jobRequest' if sort is active
+  const sortedData = [...filteredData].sort((a, b) => {
+    const aVal = (a.jobRequest || '').toLowerCase();
+    const bVal = (b.jobRequest || '').toLowerCase();
+    if (aVal < bVal) return sortAsc ? -1 : 1;
+    if (aVal > bVal) return sortAsc ? 1 : -1;
+    return 0;
+  });
+
+  useEffect(() => {
+    if (!showProfile) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setShowProfile(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showProfile]);
+
+  const handleAddCustomTab = () => {
+    setAddingTab(true);
+    setTimeout(() => newTabInputRef.current?.focus(), 0);
+  };
+  const handleConfirmAddTab = () => {
+    const name = newTabName.trim();
+    if (name && !customTabs.includes(name)) {
+      setCustomTabs(tabs => [...tabs, name]);
+      setActiveTab(name);
+    }
+    setNewTabName('');
+    setAddingTab(false);
+  };
+  const handleCancelAddTab = () => {
+    setNewTabName('');
+    setAddingTab(false);
+  };
+
+  const handleToggleFields = () => {
+    if (fieldsHidden) {
+      setHiddenColumns([]);
+      setFieldsHidden(false);
+    } else {
+      setHiddenColumns(columns.slice(1).map((_, idx) => idx + 1));
+      setFieldsHidden(true);
+    }
+  };
+
+  const handleCellView = () => {
+    setShowCellView(true);
+  };
+
+  if (!loggedIn) {
+    return (
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100vh',background:'#f5f5f5'}}>
+        <div style={{background:'#fff',padding:32,borderRadius:8,boxShadow:'0 2px 16px rgba(0,0,0,0.10)',textAlign:'center'}}>
+          <h2>You are logged out</h2>
+          <button style={{padding:'10px 32px',background:'#1976d2',color:'#fff',border:'none',borderRadius:4,fontSize:16,cursor:'pointer'}} onClick={() => setLoggedIn(true)}>Log in again</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="spreadsheet-modern-container">
       {/* Header */}
@@ -304,14 +509,27 @@ const Spreadsheet = () => {
         <div className="spreadsheet-header-actions">
           <div className="spreadsheet-search-wrapper">
             <MdSearch className="search-icon" />
-            <input className="spreadsheet-search" placeholder="Search within sheet" />
+            <input className="spreadsheet-search" placeholder="Search within sheet" value={searchText} onChange={e => setSearchText(e.target.value)} />
           </div>
           <button className="spreadsheet-header-btn notification-btn" title="Notifications">
             <MdNotificationsNone className="icon" />
           </button>
-          <div className="spreadsheet-user">
+          <div className="spreadsheet-user" style={{cursor:'pointer',position:'relative'}} onClick={() => setShowProfile(v => !v)}>
             <span className="user-avatar">JD</span>
             <span className="user-name">John Doe</span>
+            {showProfile && (
+              <div ref={profileRef} style={{position:'absolute',top:'110%',right:0,background:'#fff',boxShadow:'0 2px 8px rgba(0,0,0,0.15)',borderRadius:8,padding:16,minWidth:200,zIndex:1000}}>
+                <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+                  <span className="user-avatar" style={{fontSize:24}}>JD</span>
+                  <div>
+                    <div style={{fontWeight:600}}>John Doe</div>
+                    <div style={{fontSize:13,color:'#888'}}>john.doe@email.com</div>
+                  </div>
+                </div>
+                <button style={{width:'100%',padding:'8px 0',background:'#1976d2',color:'#fff',border:'none',borderRadius:4,cursor:'pointer'}} onClick={e => {e.stopPropagation(); setLoggedIn(false); setShowProfile(false);}}>Log out</button>
+                <button style={{position:'absolute',top:8,right:8,background:'none',border:'none',fontSize:18,cursor:'pointer',color:'#888'}} onClick={e => {e.stopPropagation();setShowProfile(false);}}>&times;</button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -320,12 +538,27 @@ const Spreadsheet = () => {
       <div className="spreadsheet-toolbar-row">
         <div className="spreadsheet-toolbar-left">
           <button className="spreadsheet-toolbar-btn" onClick={() => handleToolbarClick('Tool bar')}><MdSettings className="icon" /> Tool bar</button>
-          <button className="spreadsheet-toolbar-btn" onClick={() => handleToolbarClick('Hide fields')}><MdVisibilityOff className="icon" /> Hide fields</button>
-          <button className="spreadsheet-toolbar-btn" onClick={() => handleToolbarClick('Sort')}><MdSwapVert className="icon" /> Sort</button>
-          <button className="spreadsheet-toolbar-btn" onClick={() => handleToolbarClick('Filter')}><MdFilterList className="icon" /> Filter</button>
-          <button className="spreadsheet-toolbar-btn" onClick={() => handleToolbarClick('Cell view')}><MdViewModule className="icon" /> Cell view</button>
+          <button className="spreadsheet-toolbar-btn" onClick={handleToggleFields}>
+            <MdVisibilityOff className="icon" /> {fieldsHidden ? 'Show fields' : 'Hide fields'}
+        </button>
+          <button className="spreadsheet-toolbar-btn" onClick={handleSort}>
+            <MdSwapVert className="icon" /> Sort {sortAsc ? '▲' : '▼'}
+          </button>
+          <button className="spreadsheet-toolbar-btn" onClick={() => setShowFilter(v => !v)}>
+            <MdFilterList className="icon" /> Filter
+          </button>
+          <button className="spreadsheet-toolbar-btn" onClick={handleCellView}>
+            <MdViewModule className="icon" /> Cell view
+        </button>
         </div>
         <div className="spreadsheet-toolbar-right">
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+            onChange={handleFileImport}
+          />
           <button className="spreadsheet-header-btn" onClick={() => handleToolbarClick('Import')}><MdFileDownload className="icon" /> Import</button>
           <button className="spreadsheet-header-btn" onClick={() => handleToolbarClick('Export')}><MdFileUpload className="icon" /> Export</button>
           <button className="spreadsheet-header-btn" onClick={() => handleToolbarClick('Share')}><MdShare className="icon" /> Share</button>
@@ -387,7 +620,7 @@ const Spreadsheet = () => {
             </tr>
           </thead>
           <tbody>
-            {data.map((row, i) => (
+            {sortedData.map((row, i) => (
               <tr key={i} className={i % 2 === 0 ? 'spreadsheet-row-alt' : ''}>
                 <td className="row-number">{i + 1}</td>
                 {columns.slice(1).map((col, j) => {
@@ -406,6 +639,8 @@ const Spreadsheet = () => {
                     cellContent = <span className="spreadsheet-tag" style={{ background: priorityColors[value], color: priorityTextColors[value] }}>{value}</span>;
                   } else if (key === 'url' && value) {
                     cellContent = <a href={`https://${value}`} className="spreadsheet-link" target="_blank" rel="noopener noreferrer">{value}</a>;
+                  } else if (searchText && typeof value === 'string' && value.toLowerCase().includes(searchText.toLowerCase())) {
+                    cellContent = highlightMatch(value, searchText);
                   }
                   return (
                     <td
@@ -439,8 +674,8 @@ const Spreadsheet = () => {
               </tr>
             ))}
             {/* Empty rows for spreadsheet look */}
-            {Array.from({ length: totalRows - data.length }).map((_, idx) => (
-              <tr key={`empty-${idx}`} className={(data.length + idx) % 2 === 0 ? 'spreadsheet-row-alt' : ''}>
+            {Array.from({ length: totalRows - sortedData.length }).map((_, idx) => (
+              <tr key={`empty-${idx}`} className={(sortedData.length + idx) % 2 === 0 ? 'spreadsheet-row-alt' : ''}>
                 {Array.from({ length: columns.length }).map((_, colIdx) => (
                   <td key={colIdx}>&nbsp;</td>
                 ))}
@@ -452,17 +687,78 @@ const Spreadsheet = () => {
 
       {/* Footer Tabs */}
       <div className="spreadsheet-footer-tabs">
-        <button className="active" onClick={() => handleToolbarClick('All Orders')}>All Orders</button>
-        <button onClick={() => handleToolbarClick('Pending')}>Pending</button>
-        <button onClick={() => handleToolbarClick('Reviewed')}>Reviewed</button>
-        <button onClick={() => handleToolbarClick('Arrived')}>Arrived</button>
-        <button className="footer-plus" onClick={() => handleToolbarClick('Footer +')}>+</button>
+        <button className={activeTab === 'All Orders' ? 'active' : ''} onClick={() => setActiveTab('All Orders')}>All Orders</button>
+        <button className={activeTab === 'Pending' ? 'active' : ''} onClick={() => setActiveTab('Pending')}>Pending</button>
+        <button className={activeTab === 'Reviewed' ? 'active' : ''} onClick={() => setActiveTab('Reviewed')}>Reviewed</button>
+        <button className={activeTab === 'Arrived' ? 'active' : ''} onClick={() => setActiveTab('Arrived')}>Arrived</button>
+        {customTabs.map(tab => (
+          <button key={tab} className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab}</button>
+        ))}
+        {addingTab ? (
+          <input
+            ref={newTabInputRef}
+            value={newTabName}
+            onChange={e => setNewTabName(e.target.value)}
+            onBlur={handleCancelAddTab}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleConfirmAddTab();
+              if (e.key === 'Escape') handleCancelAddTab();
+            }}
+            style={{marginLeft:8,padding:'2px 8px',fontSize:15,borderRadius:4,border:'1px solid #1976d2',outline:'none',minWidth:60}}
+            placeholder="Tab name"
+            autoFocus
+          />
+        ) : (
+          <button className="footer-plus" onClick={handleAddCustomTab}>+</button>
+        )}
       </div>
 
       {hiddenColumns.length > 0 && (
         <button style={{ margin: '8px 0', fontSize: 13 }} onClick={handleShowAllColumns}>
           Show all columns
         </button>
+      )}
+
+      {showFilter && (
+        <div style={{position:'absolute',top:50,right:180,zIndex:2000,background:'#fff',boxShadow:'0 2px 8px rgba(0,0,0,0.15)',borderRadius:8,padding:16,minWidth:220}}>
+          <div style={{marginBottom:8,fontWeight:600}}>Filter</div>
+          <div style={{marginBottom:8}}>
+            <select value={filterCol} onChange={e => setFilterCol(e.target.value)} style={{width:'100%',padding:6,borderRadius:4,border:'1px solid #ccc'}}>
+              <option value="">Select column</option>
+              {columns.slice(1).map(col => (
+                <option key={col.key} value={col.key}>{col.label}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{marginBottom:12}}>
+            <input value={filterVal} onChange={e => setFilterVal(e.target.value)} placeholder="Value" style={{width:'100%',padding:6,borderRadius:4,border:'1px solid #ccc'}} />
+          </div>
+          <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
+            <button onClick={handleClearFilter} style={{padding:'6px 12px'}}>Clear</button>
+            <button onClick={handleApplyFilter} style={{padding:'6px 12px',background:'#1976d2',color:'#fff',border:'none',borderRadius:4}}>Apply</button>
+          </div>
+        </div>
+      )}
+      
+      {showCellView && (
+        <div className="modal-overlay" style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.2)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000}}>
+          <div className="modal-content" style={{background:'#fff',padding:24,borderRadius:8,minWidth:320,boxShadow:'0 2px 16px rgba(0,0,0,0.15)',position:'relative'}}>
+            <h3 style={{marginTop:0}}>Cell View</h3>
+            {selected ? (
+              <div style={{fontSize:18,padding:16,background:'#f5f5f5',borderRadius:4,minHeight:40}}>
+                {(() => {
+                  const row = sortedData[selected.row];
+                  const col = columns[selected.col];
+                  if (!row || !col || !col.key) return <span>No cell selected.</span>;
+                  return String((row as any)[col.key] ?? '');
+                })()}
+              </div>
+            ) : (
+              <div style={{color:'#888',fontSize:16}}>No cell selected.</div>
+            )}
+            <button style={{position:'absolute',top:12,right:12,background:'none',border:'none',fontSize:22,cursor:'pointer',color:'#888'}} onClick={() => setShowCellView(false)}>&times;</button>
+          </div>
+      </div>
       )}
     </div>
   );

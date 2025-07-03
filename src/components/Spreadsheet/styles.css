@@ -58,7 +58,21 @@
   background: #fff;
   outline: none;
   min-width: 200px;
+  color: #000;
 }
+.spreadsheet-search:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #1976d2;
+  border-color: #1976d2;
+  animation: blink-search 0.2s;
+}
+
+@keyframes blink-search {
+  0% { box-shadow: 0 0 0 2px #1976d2; }
+  50% { box-shadow: 0 0 0 4px #90caf9; }
+  100% { box-shadow: 0 0 0 2px #1976d2; }
+}
+
 .spreadsheet-user {
   display: flex;
   align-items: center;
@@ -564,3 +578,16 @@
   max-width: 60px;
   padding: 0;
   }
+
+.spreadsheet-highlight {
+  background: #fff59d;
+  color: #000;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.spreadsheet-table input[type="text"],
+.spreadsheet-table input[type="input"],
+.spreadsheet-table input {
+  color: #d32f2f;
+}
