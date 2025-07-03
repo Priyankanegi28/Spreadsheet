@@ -1,69 +1,80 @@
-# React + TypeScript + Vite
+# Spreadsheet Prototype
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, interactive spreadsheet web app built with React, TypeScript, and Vite. This project provides an Excel/Google Sheets-like experience with a pixel-perfect UI and rich interactivity.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Pixel-perfect spreadsheet UI** matching Figma and Excel/Sheets style
+- **Editable cells** with keyboard navigation (arrows, Tab, Enter, F2)
+- **Add new rows** with the + button in the header
+- **Column resize and hide/show** (drag handles, hide/show buttons)
+- **Toolbar with interactive buttons:**
+  - **Import:** Upload `.csv` or `.xlsx` files (file picker)
+  - **Export:** Download current data as `.csv`
+  - **Share:** Copy shareable link to clipboard
+  - **New Spreadsheet:** Clears all data for a fresh start
+  - **Hide/Show fields:** Toggle all columns except row number
+  - **Sort:** Sort by "Job Request" column (toggle asc/desc)
+  - **Filter:** Filter rows by any column and value
+  - **Cell view:** View full content of the selected cell in a modal
+- **Footer tabs:**
+  - **All Orders, Pending, Reviewed, Arrived:** Filter rows by status
+  - **Custom tabs:** Add your own named tabs with the + button
+- **Search bar:**
+  - Instantly filter rows by any cell content (case-insensitive)
+  - Highlights matching text in the table
+- **Profile popover:**
+  - Click avatar/name to view user details and log out
+- **Responsive, accessible, and keyboard-friendly**
 
-## Expanding the ESLint configuration
+## Usage
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 1. Install dependencies
+```sh
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 2. Start the development server
+```sh
+npm run dev
 ```
+Visit [http://localhost:5173](http://localhost:5173) in your browser.
+
+### 3. Build for production
+```sh
+npm run build
+```
+
+### 4. Lint and type-check
+```sh
+npm run lint
+```
+
+## How to Use the App
+
+- **Edit cells:** Click or double-click a cell, type, and press Enter or click away to save. Use arrow keys, Tab, or Enter to navigate.
+- **Add row:** Click the + button in the table header.
+- **Import:** Click Import, select a `.csv` or `.xlsx` file. (File is not parsed into the table by default; extend logic as needed.)
+- **Export:** Click Export to download the current table as a CSV file.
+- **Share:** Click Share to copy the current page URL to your clipboard.
+- **New Spreadsheet:** Click New Action to clear all data and start fresh.
+- **Hide/Show fields:** Click Hide fields to hide all columns except row number; click again to show them.
+- **Sort:** Click Sort to sort by "Job Request" (toggle asc/desc).
+- **Filter:** Click Filter, select a column and value, and apply. Click Clear to remove the filter.
+- **Cell view:** Click Cell view to see the full content of the selected cell in a modal.
+- **Tabs:** Use footer tabs to filter by status or add your own custom tabs.
+- **Search:** Type in the search bar to instantly filter and highlight matches in the table.
+- **Profile:** Click the user avatar/name to view details and log out.
+
+## Tech Stack
+- React 18 + TypeScript
+- Vite
+- CSS Modules
+- React Icons
+
+## Customization
+- Extend import logic to parse and display uploaded files
+- Add more advanced filters, tab management, or spreadsheet features as needed
+
+## License
+MIT
