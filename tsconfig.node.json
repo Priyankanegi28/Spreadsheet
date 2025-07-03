@@ -4,11 +4,11 @@
     "target": "esnext",
     "lib": ["esnext"],
     "types": ["node"],
-    "module": "ESNext",
+    "module": "NodeNext",
     "skipLibCheck": true,
 
     /* Bundler mode */
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "moduleDetection": "force",
     "noEmit": false,
     "allowSyntheticDefaultImports": true,
