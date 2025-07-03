@@ -2,7 +2,8 @@
   "compilerOptions": {
     "composite": true,
     "target": "ES2023",
-    "lib": ["es2020"],
+    "lib": ["esnext"],
+    "types": ["node"],
     "module": "ESNext",
     "skipLibCheck": true,
 
